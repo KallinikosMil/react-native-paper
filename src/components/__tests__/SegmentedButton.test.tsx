@@ -1,4 +1,8 @@
+import * as React from 'react';
+import { Text } from 'react-native';
+
 import { describe, expect, it, jest } from '@jest/globals';
+import { userEvent } from '@testing-library/react-native';
 
 import { getTheme } from '../../core/theming';
 import { render, screen } from '../../test-utils';
@@ -10,6 +14,94 @@ import {
 } from '../SegmentedButtons/utils';
 
 const stateOpacity = tokens.md.sys.state.opacity;
+
+const makeIcon = (name: string) =>
+  function IconRenderer() {
+    return <Text testID={`icon-${name}`}>{name}</Text>;
+  };
+
+it('keeps rendering icons when the buttons array is replaced', async () => {
+  const props = { value: 'edit', onValueChange: () => {} };
+
+  const { rerender } = await render(
+    <SegmentedButtons
+      {...props}
+      buttons={[
+        { value: 'edit', icon: makeIcon('edit') },
+        { value: 'camera', icon: makeIcon('camera') },
+        { value: 'add', icon: makeIcon('add') },
+      ]}
+    />
+  );
+
+  expect(screen.getByTestId('icon-edit')).toBeTruthy();
+  expect(screen.getByTestId('icon-camera')).toBeTruthy();
+  expect(screen.getByTestId('icon-add')).toBeTruthy();
+
+  await rerender(
+    <SegmentedButtons
+      {...props}
+      buttons={[
+        { value: 'cancel', icon: makeIcon('cancel') },
+        { value: 'delete', icon: makeIcon('delete') },
+      ]}
+    />
+  );
+
+  expect(screen.getByTestId('icon-cancel')).toBeTruthy();
+  expect(screen.getByTestId('icon-delete')).toBeTruthy();
+});
+
+it('keeps rendering icons when the buttons array is chosen conditionally', async () => {
+  // Both arrays are declared inside the component, so every `icon` is a new
+  // function identity on each render, and the swap happens on press.
+  const ConditionalButtons = () => {
+    const [value, setValue] = React.useState('edit');
+    const [isEditing, setIsEditing] = React.useState(false);
+
+    return (
+      <SegmentedButtons
+        value={value}
+        onValueChange={setValue}
+        buttons={
+          isEditing
+            ? [
+                {
+                  value: 'cancel',
+                  icon: () => <Text testID="icon-cancel">cancel</Text>,
+                },
+                {
+                  value: 'delete',
+                  icon: () => <Text testID="icon-delete">delete</Text>,
+                },
+              ]
+            : [
+                {
+                  value: 'edit',
+                  icon: () => <Text testID="icon-edit">edit</Text>,
+                  onPress: () => setIsEditing(true),
+                },
+                {
+                  value: 'camera',
+                  icon: () => <Text testID="icon-camera">camera</Text>,
+                },
+              ]
+        }
+      />
+    );
+  };
+
+  await render(<ConditionalButtons />);
+
+  expect(screen.getByTestId('icon-edit')).toBeTruthy();
+  expect(screen.getByTestId('icon-camera')).toBeTruthy();
+
+  await userEvent.press(screen.getAllByRole('button')[0]);
+
+  expect(screen.queryByTestId('icon-edit')).toBeNull();
+  expect(screen.getByTestId('icon-cancel')).toBeTruthy();
+  expect(screen.getByTestId('icon-delete')).toBeTruthy();
+});
 
 it('renders segmented button', async () => {
   const tree = (
